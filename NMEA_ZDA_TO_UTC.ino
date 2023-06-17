@@ -158,11 +158,12 @@ void setup() {        // Au démarrare du Artemis thing plus toutes les broches 
   pinMode(LED_BUILTIN, OUTPUT);                                       // Gestion de la LED bleue à OFF.  
   pinMode( ppsIntPin, INPUT );                                        //set the IRQ pin as an input pin. do not use INPUT_PULLUP - the ZED-F9R will pull the pin.
   attachInterrupt(digitalPinToInterrupt(ppsIntPin), ppsISR, RISING);  // Le ZED-F9R will pull the interrupt pin HIGH when a PPS event is triggered.
-  Serial.print("PPS Interrupt= OK, " );                                // Confirmer la mise en place de l'interruption
+  Serial.print("PPS Interrupt= OK, " );                               // Confirmer la mise en place de l'interruption
   pinMode( transmitReadyPin, INPUT );                                 //set the IRQ pin as an input pin. do not use INPUT_PULLUP - the ZED-F9R will pull the pin.
-  //
-  while( Serial1.available()){ tempoByte = Serial1.read();}           // Vider le tampon des caractères reçus du GPS pour un démarrage plus propre de loop().
-  Serial.println("Flush RX= OK.");
+  while ( !Serial );                                                  // Attendre l'ouverture de la communication (nécessaire sur certain board seulement).
+  Serial.print( "Serial USB= OK, " );                                 // Confirmation de la disponibilité du port Série USB  "Serial"  
+    while( Serial1.available()){ tempoByte = Serial1.read();}           // Vider le tampon des caractères reçus du GPS pour un démarrage plus propre de loop().
+  Serial.println("Flush RX= OK.");   
 }
 //
 //
@@ -242,7 +243,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         // La fonction millis() prend 0.718 mS à s'exécuter (temps réel 0.720160 mS).
         // Les 5 prochains caractères prennent 0.445 mS à transmettre à 115200 bauds (temps réel 0.446339 mS).
         // Le délais moyen PPS et $UTC est 0.258 mS (delta temps réel 0.000776 mS)
-        // Total 1.167 mS à ajouter pour compenser ce temps de latence. Quand le data loggeur va recevoir le message UTC la précision par rapport au signal PPS est de ± 0.567 mS
+        // Total 1.167 mS à ajouter pour le temps de latence. L'heure UTC du message $UTC est à ± 0.5 mS du réel quand le point décimal des heures est reçue par le data loggeur (en moyenne ± 0.3 millisecondes).
         DeltaUTC = millis() + 1UL - horodatePPS; 
         if (DeltaUTC >= 740UL){                             // Si délais anormalement long de 740 mS. Rollover de millis() après 49 jours ? Autres ?
           Serial.write( "2591\r\n" ); }                      // Impose arbitrairement 259.1 mS. Le ".2591" est facile à chercher dans les logs, car normalement le 4e chiffre après le point est toujours zéro. 
@@ -252,7 +253,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
           Serial1.print( DeltaUTC );                        // Différentiel entre le temps réel UTC et le temps de transit GPS->Data Loggeur. 
           Serial1.write( "0\r\n");                          // Le 4e chiffre après le point pour les secondes.
         }  
-        }//endif $GNRMC,                                  //  Duré totale de l'envoi du message UTC environ 2.4 mS :) :) :)
+      }//endif $GNRMC,                                  //  Duré totale de l'envoi du message UTC environ 2.4 mS :) :) :)
       // Message $GNZDA
       else if (receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'Z' && receivedChars[4] == 'D' && receivedChars[5] == 'A' && receivedChars[6] == ',' ) { //Message "$GNZDA,"
         // Peut être entrecouper d'un délai jusqu'à 800 mS à cause de la priorité plus grande accordée au traitement du signal PPS dans le GPS quel celle pour l'envoi des messages NMEA (avant ou pendant ou  après le PPS).
@@ -272,9 +273,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
       debutNMEA = false;           // Message traité on attend un nouveau message
       finNMEA = false;                               // Message traité on attend un nouveau message laisse la fin à true et le début à false pour indiquer qu'un bloc a été entièrement traité et on est en attente du prochain PPS
     }//endif debut et fin,
-
-
-    } //if find bloc NMEA depuis 10 mS
+  } //endif available()
 }//end loop
 //
 //
