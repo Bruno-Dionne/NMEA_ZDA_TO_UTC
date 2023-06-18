@@ -196,9 +196,9 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
     Serial.printf( ", DeltaUTC( %u mS ).\r\n",DeltaUTC ); // Serial.printf ne fonctionne pas avec tous les boards Arduino. Sinon remplacer par de print/prinln/write.
   }//endif ppsISR
   //
-  if( Serial1.available() > 0) {                                  // Caractères disponibles en provenance du GPS.
+  if( Serial1.available() ) {                                  // Caractères disponibles en provenance du GPS.
     inByte = Serial1.read();                                  // Lire un caractère comme un byte en provenance du GPS ( Serial1 broche RX en provenance du GPS).
-    Serial1.write( inByte  );                                 // Écrire ce même caractère vers le data logger         ( Serial1 broche TX à destination du data loggeur).
+    Serial1.write( inByte /*= Serial1.read() */);                                 // Écrire ce même caractère vers le data logger         ( Serial1 broche TX à destination du data loggeur).
     //
     if( inByte == '$' ) {                                     // Est-ce un début de message '$'
       debutNMEA = true;                                       // Début de message détecté.
@@ -233,6 +233,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         utcTime[5] = receivedChars[12];         //S
         utcTime[6] = receivedChars[13];         //.  on sauve des mS en utilisant directement receivedChars 
         // À partir d'ici nous avons la date et l'heure UTC, nous pouvons construire et envoyer le message $UTC.
+/*
         Serial1.write( "$UTC,");                // $UTC,  Nom du message     
         Serial1.write( &utcDate[0], 9);         // AAAAMMJJ,
         Serial1.write( &receivedChars[7], 7);   // HHMMSS.
@@ -243,13 +244,14 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         // Total 1.167 mS à ajouter pour le temps de latence. L'heure UTC du message $UTC est à ± 0.5 mS du réel quand le point décimal des heures est reçue par le data loggeur (en moyenne ± 0.3 millisecondes).
         DeltaUTC = millis() + 1UL - horodatePPS; 
         if (DeltaUTC >= 740UL){                             // Si délais anormalement long de 740 mS. Rollover de millis() après 49 jours ? Autres ?
-          Serial.write( "2591\r\n" ); }                      // Impose arbitrairement 259.1 mS. Le ".2591" est facile à chercher dans les logs, car normalement le 4e chiffre après le point est toujours zéro. 
+          Serial1.write( "2591\r\n" ); }                      // Impose arbitrairement 259.1 mS. Le ".2591" est facile à chercher dans les logs, car normalement le 4e chiffre après le point est toujours zéro. 
         else {  
           if ( DeltaUTC < 100 ) { Serial1.write( '0'); }    // Format du nombre avec des zéros significatifs avant
           if ( DeltaUTC <  10 ) { Serial1.write( '0'); }    // Format du nombre avec des zéros significatifs avant
           Serial1.printf( "%u0\r\n", DeltaUTC );                        // Différentiel entre le temps réel UTC et le temps de transit GPS->Data Loggeur. 
           //Serial1.write( "0\r\n");                          // Le 4e chiffre après le point pour les secondes.
-        }  
+
+        }  */
       }//endif $GNRMC,                                  //  Duré totale de l'envoi du message UTC environ 2.4 mS :) :) :)
       else if (receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'Z' && receivedChars[4] == 'D' && receivedChars[5] == 'A' && receivedChars[6] == ',' ) { //Message "$GNZDA,"
         // Peut être entrecouper d'un délai jusqu'à 800 mS à cause de la priorité plus grande accordée au traitement du signal PPS dans le GPS quel celle pour l'envoi des messages NMEA (avant ou pendant ou  après le PPS).
@@ -266,6 +268,20 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         utcDate[6] = receivedChars[17];   //J
         utcDate[7] = receivedChars[18];   //J
         utcDate[8] = receivedChars[27];   //,
+
+        Serial1.write( "$UTC,");                // $UTC,  Nom du message     
+        Serial1.write( &utcDate[0], 9);         // AAAAMMJJ,
+        Serial1.write( &receivedChars[7], 7);   // HHMMSS.
+        //Serial1.write( &utcTime[0], 7);  
+        // La fonction millis() prend 0.718 mS à s'exécuter (temps réel 0.720160 mS).
+        // Les 5 prochains caractères prennent 0.445 mS à transmettre à 115200 bauds (temps réel 0.446339 mS).
+        // Le délais moyen PPS et $UTC est 0.258 mS (delta temps réel 0.000776 mS)
+        // Total 1.167 mS à ajouter pour le temps de latence. L'heure UTC du message $UTC est à ± 0.5 mS du réel quand le point décimal des heures est reçue par le data loggeur (en moyenne ± 0.3 millisecondes).
+        DeltaUTC = millis() + 1UL - horodatePPS;                              // Si DeltaUTC anormalement long ? Rollover de millis() après 49 jours ? Autres ?
+        if (DeltaUTC >= 800UL) { Serial1.write( "2543\r\n" ); }               // Impose arbitrairement 254.3 mS. Le ".2543" est facile à chercher dans les logs, car normalement le 4e chiffre après le point est toujours zéro.   
+        else if( DeltaUTC > 99){ Serial1.printf( "%u0\r\n", DeltaUTC ); }     // Entre 100 et 799
+        else if( DeltaUTC > 9 ){ Serial1.printf( "0%u0\r\n", DeltaUTC ); }    // Entre 10 et 99
+        else { Serial1.printf( "00%u0\r\n", DeltaUTC ); }                     // Entre 0 et 9
       }//endif $GNZDA,
       debutNMEA = false;           // Message traité on attend un nouveau message
       finNMEA = false;                               // Message traité on attend un nouveau message laisse la fin à true et le début à false pour indiquer qu'un bloc a été entièrement traité et on est en attente du prochain PPS
