@@ -6,8 +6,8 @@
 //               Ce Sketch Arduino insère de manière transparente le message $UTC aux autres messages NMEA d'un GPS générique ici le U-BLox ZED-F9R de Spakfun.com
 //               Le message $UTC est contrut à partir du message $GNZDA pour la date et $GNRMC pour l'heure.
 //               Le programme prend en compte le temps de réception, de transmission et de traitement des messages NMEA et ajoute cette correction au temps sUTC du message $UTC
-//               Le temps UTC du message $UTC lorsqu'il est reçu par le data loggeur externe est donc à ± 0.567 mS du temps réel d'émission du signal PPS par le GPS.
-//               Il est donc raisonnable de considérer le message $UTC comme une excellente approximation du signal PPS quand il n'est pas possible d'avoir au signal PPS original.
+//               Le temps UTC du message $UTC lorsqu'il est reçu par le data loggeur externe est donc à ± 0.5 mS du temps réel d'émission du signal PPS par le GPS.
+//               Il est donc raisonnable de considérer le message $UTC comme une excellente approximation du signal PPS quand il n'est pas possible d'avoir accès au signal PPS original.
 //
 // Version    : 2023-06-15, 21h54
 // Remarques  : Ajout d'une limite maximale pour DeltaUTC (Protection anti rollover de millis() et autres délais possibles dans la communication GPS/Artemis).
