@@ -26,7 +26,7 @@ A test with a logic analyzer and the U-Blox ZED-F9R GPS, shows that the "first c
 This delay is variable and depends on the real-time processing load of the GPS and its setting. 
 It's therefore not appropriate to use the "first character" received as an emulation of the PPS signal. Use the $UTC message instead.
 
-#español ( Google Translate !)
+# Español ( Google Translate !)
 
 Inserción del mensaje $UTC con corrección de offset en tiempo real con la señal PPS.
 
