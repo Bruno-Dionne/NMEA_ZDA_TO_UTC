@@ -300,14 +300,16 @@ void loop() { // This loop() maybe too slow with Arduino low frequency board < 1
 //
 // The misterious mills() fonction !
 //
-// The millis() function rely on an integer counter to work. La fonction millis() est basée sur un compteur interne au CPU qui divise la fréquence du processeur par 1024
-// Si le CPU a une fréquence 48 MHz ou 48 000 000 de cycle par secondes
-// Alors 48 000 000 divisés par 1024 donnent 46 875 cycles par secondes
-// On a 46 875 divisés par 1000 = 46.875 cycles par millisecondes
-// Le compteur est un nombre entier, donc on arrondi à 47 cycles par milliseconde
-// le ratio de 46.85 divise par 47 donne 0,9973 
-// Donc un tick d'une durée supposée de 1 milliseconde est en réalité 0.9973 milliseconde.
-// Donc 1 000 millisecondes multipliées par le ratio 0,9973 et arrondies donnent 977 tick de simili millisecondes pour une durée réelle de 1 000 millisecondes.
+// The millis() function rely on an integer counter to work and on the CPU frequancy divided by 1024.
+// A CPU at 48 MHz,translate to 48 000 000 cycles / second.
+// So 48 000 000 cycle divded by 1024 give 46 875 cycles for each second.
+// 46 875 cycles divided by 1000 equal 46.875 cycles for each millisecond
+// The millis() counter is an integer number, so we must round for 47 cycles by millisecond
+// This give a ratio 46.85 on 47 of 0,9968 
+// A one millisecond for the CPU is in real time more 0.9973 millisecond.
+// A delay of 1 000 millisecond times 0,9968 and rounded give 977 tick for the CPU for a real time equivalent of 1 000 millisecondes.
+// This is somewhat 1 mS difference on real time for a delay of 272 mS.
+// The Arduino use an algorithm to partially compensate for that on the long run.
 //
 //
 // ***** The End ! - Bonne campagne de mesure Raphaël *****
