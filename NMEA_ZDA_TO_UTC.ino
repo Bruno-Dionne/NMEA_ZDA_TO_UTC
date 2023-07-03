@@ -185,43 +185,43 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
   //  
   if (ppsISR_ == true){                           // Un event PPS est détecté.
     //horodatePPS = millis();                     // Cette variable est assignée dans la routine de gestion de l'interruption PPS.
+    digitalWrite(LED_BUILTIN, HIGH);              // Allumer la LED bleue pour indiquer l'arrivé du signal PPS.    
     Serial.write( "$UTC,");                       // $UTC,  Nom du message     
     Serial.write( &utcDate[0], 9);                // AAAAMMJJ,
     Serial.write( &utcTime[0], 7);                // HHMMSS.
     Serial.printf( "%u\r\n ", DeltaUTC );         // Serial.printf ne fonctionne pas avec tous les boards Arduino. Sinon remplacer par de print/prinln/write.
     ppsISR_ = false;                              // indiqué que le traitement PPS est fait.
-    digitalWrite(LED_BUILTIN, HIGH);              // Allumer la LED bleue pour indiquer l'arrivé du signal PPS.
   } //endif ppsISR 
   //
-  if( Serial1.available() ) {                                  // Caractères disponibles en provenance du GPS.
+  if( Serial1.available() ) {                                 // Caractères disponibles en provenance du GPS.
     inByte = Serial1.read();                                  // Lire un caractère comme un byte en provenance du GPS ( Serial1 broche RX en provenance du GPS).
-    Serial1.write( inByte /*= Serial1.read() */);                                 // Écrire ce même caractère vers le data logger         ( Serial1 broche TX à destination du data loggeur).
+    Serial1.write( inByte /*= Serial1.read() */);            // Écrire ce même caractère vers le data logger         ( Serial1 broche TX à destination du data loggeur).
     //
     if( inByte == '$' ) {                                     // Est-ce un début de message '$'
       debutNMEA = true;                                       // Début de message détecté.
-      finNMEA   = false;                                      // Début message alors annule fin de message.
+      finNMEA   = false;                                      // Début message, alors annule fin de message.
       receivedChars[0] = inByte;                              // Enregistre la caractère courant dans le buffer. Le début de message commence toujours à l'indice zéro du tableau      
-      indexMsg = 1;   
+      indexMsg = 1;                                           // incrémente le pointeur du tableau des caractères reçus pour le prochain caractère.
     } else if ( inByte == 10 /*|| indexMsg > 87*/ ) {         // Fin message (Max longueur NMEA = 85, mais U-BLox génère exceptionnellement des messages NMEA d'une longueur = 87 et des messages vides avec un LF à la fin.  
-        receivedChars[indexMsg] = inByte;                     // Enregistre le caractère courant dans le buffer, Force à LF au cas ou le message > 82 caractères
-        indexMsg++;                                           // incrémente le pointeur du tableau des caractères reçus.
+        receivedChars[indexMsg] = inByte;                     // Enregistre le caractère courant dans le buffer.
+        indexMsg++;                                           // incrémente le pointeur du tableau des caractères reçus pour le prochain caractère.
         finNMEA = true;                                       // Fin de message détectée.
       }                             
     else {                                                    // Si un message est en cours de détection, accumuler les caractères dans le tableau pour traitement ultérieur
       if( debutNMEA){                                         // N'enregistre aucun caractère s'il n'y a pas un début de détecté. On évite le traitement en milieu de message, les lignes vides, les problèmes de transmission.
         receivedChars[indexMsg] = inByte;                     // Enregistre la caractère courant dans le buffer
-        indexMsg++;                                           // incrémente l'index tableau  
+        indexMsg++;                                           // incrémente le pointeur du tableau des caractères reçus pour le prochain caractère.
       }
     }
     digitalWrite(LED_BUILTIN, LOW);              // Éteindre la LED bleue pour indiquer l'arrivée du bloc de message NMEA suivant le signal PPS.
     //
     // Un caractère reçu a été envoyé et traité.
     // S'il reste des caractères du bloc à recevoir, vous avez entre 2.6 mS et maximum 5.6 mS pour faires des tâches connexes. Sinon il y a risque de perdre des caractères en provenance du GPS (Tampon Serie de 32 à 64 caractères à 155200 bauds)
-    // Si c'est le dernier caractère du bloc vos avez environ 900 mS pavant le prochain PPS pour faire des tâches connexes. Sinon il y a risque de perdre des caractères en provenance du GPS.
+    // Si c'est le dernier caractère du bloc vos avez environ 900 mS avant le prochain PPS pour faire des tâches connexes. Sinon il y a risque de perdre des caractères en provenance du GPS.
     //
-    if ( debutNMEA &&  finNMEA ) {                  // Le message NMEA courant est complet.
+    if ( debutNMEA && finNMEA ) {                // Le message NMEA courant est complet.
       if ( receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'R' && receivedChars[4] == 'M' && receivedChars[5] == 'C' && receivedChars[6] == ',' ) { // Message "$GNRMC," détecté. Extraire l'heure UTC.
-        digitalWrite(LED_BUILTIN, HIGH);              // Allumer la LED bleue pour indiquer l'arrivé du signal PPS.
+        //digitalWrite(LED_BUILTIN, HIGH);      // Allumer la LED bleue pour indiquer l'arrivé du signal PPS.
         utcTime[0] = receivedChars[7];          //H
         utcTime[1] = receivedChars[8];          //H
         utcTime[2] = receivedChars[9];          //M
@@ -230,10 +230,10 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         utcTime[5] = receivedChars[12];         //S
         utcTime[6] = receivedChars[13];         //.  on sauve des mS en utilisant directement receivedChars 
       }//endif $GNRMC,                                  //  Duré totale de l'envoi du message UTC environ 2.4 mS :) :) :)
-      else if (receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'Z' && receivedChars[4] == 'D' && receivedChars[5] == 'A' && receivedChars[6] == ',' ) { //Message "$GNZDA,"
-        // Peut être entrecouper d'un délai jusqu'à 800 mS à cause de la priorité plus grande accordée au traitement du signal PPS dans le GPS quel celle pour l'envoi des messages NMEA (avant ou pendant ou  après le PPS).
+      else if (receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'Z' && receivedChars[4] == 'D' && receivedChars[5] == 'A' && receivedChars[6] == ',' ) { //Message "$GNZDA," détecté. Extraire la date UTC.
+        // Peut être entrecoupé d'un délai jusqu'à 800 mS à cause de la priorité plus grande accordée au traitement du signal PPS dans le GPS quel celle pour l'envoi des messages NMEA (avant ou pendant ou  après le PPS).
         // Ce n'est pas grave si le message "$GNZDA," est entrecoupé d'un délai d'environ 750 mS car stratégiquement on ne garde que sa date. 
-        // Raphaël ne fait pas de kayak à 00h00 UTC, car il y a bogue extrême ici. Le changement de date est potentiellement retardé d'une seconde à cause de la dérive du PPS dans les messages NMEA :), mais l'heure est toujours bonne.
+        // S.V.P. Raphaël ne fait pas de kayak à 00h00 UTC, car il y a bogue ici. Le changement de date est potentiellement retardé d'une seconde à cause de la dérive du PPS dans les messages NMEA :), mais l'heure est toujours bonne.
         // Autre BOGUE potentiel si tu restes dans to Kayak plus de 49 jours tu risques d'avoir un bogue dans l'heure UTC, car le compteur millis va faire un rollover de 4294967295 à zéro. Désolé ! :)
         // Extraire la date du message ZDA
         utcDate[0] = receivedChars[23];   //A
@@ -255,7 +255,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         // Le délais moyen PPS et $UTC est 0.258 mS (delta temps réel 0.000776 mS)
         // Total 1.167 mS à ajouter pour le temps de latence. L'heure UTC du message $UTC est à ± 0.5 mS du réel quand le point décimal des heures est reçue par le data loggeur (en moyenne ± 0.3 millisecondes).
         DeltaUTC = millis() + 1UL - horodatePPS;                              // Si DeltaUTC anormalement long ? Rollover de millis() après 49 jours ? Autres ?
-        if (DeltaUTC >= 700UL) { Serial1.write( "2678\r\n" ); }               // Impose arbitrairement une correction fixe facile à cherche dans les fichiers de log, car normalement le 4e chiffre après le point est toujours à zéro.   
+        if (DeltaUTC >= 700UL) { Serial1.write( "2678\r\n" ); }               // Impose arbitrairement une correction fixe. Facile à cherche dans les fichiers de log, car normalement le 4e chiffre après le point est toujours à zéro.   
         else if( DeltaUTC > 99){ Serial1.printf( "%u0\r\n", DeltaUTC ); }     // Entre 100 et 799
         else if( DeltaUTC > 9 ){ Serial1.printf( "0%u0\r\n", DeltaUTC ); }    // Entre 10 et 99
         else { Serial1.printf( "00%u0\r\n", DeltaUTC ); }                     // Entre 0 et 9
@@ -264,8 +264,8 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
          Serial.write( "GPS COLD START ! Attente rétablissement du signal PPS.\r\n" ); 
        }  
       }//endif $GNZDA,
-      debutNMEA = false;           // Message traité on attend un nouveau message
-      finNMEA = false;                               // Message traité on attend un nouveau message laisse la fin à true et le début à false pour indiquer qu'un bloc a été entièrement traité et on est en attente du prochain PPS
+      debutNMEA = false;           // Message traité on attend un nouveau message.
+      finNMEA = false;             // Message traité on attend un nouveau message.
     }//endif debut et fin,
   } //endif available()
 }//end loop
@@ -323,5 +323,9 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
 // Donc 1 000 millisecondes multipliées par le ratio 0,9973 et arrondies donnent 977 tick de simili millisecondes pour une durée réelle de 1 000 millisecondes.
 //
 //
+//  void * memcpy ( void * destination, const void * source, size_t num );
+//  /* using memcpy to copy structure: */
+//  memcpy ( &person_copy, &person, sizeof(person) );
+//
+//
 // ***** LA VRAIE FIN - Bonne campagne de mesure Raphaël *****
-
