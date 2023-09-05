@@ -4,7 +4,7 @@
 // Auteur      : Bruno Dionne 2023-06-04
 // Motivation  : Un data loggeur commercial avec 8 ports série, refuse de fonctionner tant que le message GPS non standard "$UTC,<date>,<time>" n'est pas reçu à intervalle régulier.
 //               Ce Sketch Arduino insère de manière transparente le message $UTC aux autres messages NMEA d'un GPS générique ici le U-BLox ZED-F9R de Spakfun.com
-//               Le message $UTC est contrut à partir du message $GNZDA pour la date et $GNRMC pour l'heure.
+//               Le message $UTC est contrit à partir du message $GNZDA pour la date et $GNRMC pour l'heure.
 //               Le programme prend en compte le temps de réception, de transmission et de traitement des messages NMEA et ajoute cette correction au temps sUTC du message $UTC
 //               Le temps UTC du message $UTC lorsqu'il est reçu par le data loggeur externe est donc à ± 0.5 mS du temps réel d'émission du signal PPS par le GPS.
 //               Il est donc raisonnable de considérer le message $UTC comme une excellente approximation du signal PPS quand il n'est pas possible d'avoir accès au signal PPS original.
@@ -43,7 +43,7 @@
 //     Synchroniser l'horloge en temps réel RTC du Artemis thing plus avec le temps UTC aux fins de validation et vérification (GPS time anti spoofing).
 //     Ajouter une fonction au bouton usager du Artemis Thing Plus pour des fonctionnalités supplémentaires (Ex: Start/Stop ou avec ou sans $UTC, etc. ). 
 //     Ajouter une interruption pour capturer des alarmes de l'horloge en temps réel RTC du Artémis Thing Plus pour des fonctionnalités supplémentaires.
-//     Ajouter des sondes externes pour supporter plus de types de messages NMEA (Magnetomètre, Temperature, Humidité, Salinité, Pression, etc.).
+//     Ajouter des sondes externes pour supporter plus de types de messages NMEA (Magnétomètre, Temperature, Humidité, Salinité, Pression, etc.).
 //     
 //
 // ***** Include  *****
@@ -142,25 +142,25 @@ void TransmitReadyISR()                         // Noter le signal de la broche 
 //  alarmISR_ = true;  
 //}
 //
-//***************************************************************/
-// ***** Appelé une fois quand le MCU est alimenté ou reset *****/
-//***************************************************************/
+//************************************************************************/
+// ***** Appelé une fois quand le MCU est alimenté ou après un reset *****/
+//************************************************************************/
 //
 void setup() {        // Au démarrare du Artemis thing plus toutes les broches sont "pulled LOW". 
   byte tempoByte = 0;
   Serial.begin( 115200 );                                             // Démarrer la communication Serie USB.
   while ( !Serial );                                                  // Attendre l'ouverture de la communication (nécessaire sur certain board seulement).
-  Serial.print( "Serial_0-USB( OK ), " );                                 // Confirmation de la disponibilité du port Série USB  "Serial"  
+  Serial.print( "Serial_0-USB( OK ), " );                             // Confirmation de la disponibilité du port Série USB  "Serial"  
   Serial1.begin( 115200 );                                            // Port série UART du Artemis thing plus.  "Serial1"
   while ( !Serial1 );                                                 // Wait for serial connection to open (only necessary on some boards).
-  Serial.print( "Serial_1-UART( OK ), " );                               // Confirmation de la disponibilité du port Série UART "Serial1"
+  Serial.print( "Serial_1-UART( OK ), " );                            // Confirmation de la disponibilité du port Série UART "Serial1"
   // 
   pinMode(LED_BUILTIN, OUTPUT);                                       // Gestion de la LED bleue à OFF.  
   pinMode( ppsIntPin, INPUT );                                        //set the IRQ pin as an input pin. do not use INPUT_PULLUP - the ZED-F9R will pull the pin.
   attachInterrupt(digitalPinToInterrupt(ppsIntPin), ppsISR, RISING);  // Le ZED-F9R will pull the interrupt pin HIGH when a PPS event is triggered.
-  Serial.print("PPS_Interrupt( OK ), " );                               // Confirmer la mise en place de l'interruption
+  Serial.print("PPS_Interrupt( OK ), " );                             // Confirmer la mise en place de l'interruption
   pinMode( transmitReadyPin, INPUT );                                 //set the IRQ pin as an input pin. do not use INPUT_PULLUP - the ZED-F9R will pull the pin.
-  while( Serial1.available()){ tempoByte = Serial1.read();}           // Vider le tampon des caractères reçus du GPS pour un démarrage plus propre de loop().
+  while( Serial1.available()){ /*tempoByte = */Serial1.read();}       // Vider le tampon des caractères reçus du GPS pour un démarrage plus propre de loop().
   Serial.println("Pre_Flush_RX( OK ).");   
 }
 //
@@ -217,7 +217,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
     //
     // Un caractère reçu a été envoyé et traité.
     // S'il reste des caractères du bloc à recevoir, vous avez entre 2.6 mS et maximum 5.6 mS pour faires des tâches connexes. Sinon il y a risque de perdre des caractères en provenance du GPS (Tampon Serie de 32 à 64 caractères à 155200 bauds)
-    // Si c'est le dernier caractère du bloc vos avez environ 900 mS avant le prochain PPS pour faire des tâches connexes. Sinon il y a risque de perdre des caractères en provenance du GPS.
+    // Si c'est le dernier caractère du bloc vous avez environ 900 mS avant le prochain PPS pour faire des tâches connexes. Sinon il y a risque de perdre des caractères en provenance du GPS.
     //
     if ( debutNMEA && finNMEA ) {                // Le message NMEA courant est complet.
       if ( receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'R' && receivedChars[4] == 'M' && receivedChars[5] == 'C' && receivedChars[6] == ',' ) { // Message "$GNRMC," détecté. Extraire l'heure UTC.
@@ -234,7 +234,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         // Peut être entrecoupé d'un délai jusqu'à 800 mS à cause de la priorité plus grande accordée au traitement du signal PPS dans le GPS quel celle pour l'envoi des messages NMEA (avant ou pendant ou  après le PPS).
         // Ce n'est pas grave si le message "$GNZDA," est entrecoupé d'un délai d'environ 750 mS car stratégiquement on ne garde que sa date. 
         // S.V.P. Raphaël ne fait pas de kayak à 00h00 UTC, car il y a bogue ici. Le changement de date est potentiellement retardé d'une seconde à cause de la dérive du PPS dans les messages NMEA :), mais l'heure est toujours bonne.
-        // Autre BOGUE potentiel si tu restes dans to Kayak plus de 49 jours tu risques d'avoir un bogue dans l'heure UTC, car le compteur millis va faire un rollover de 4294967295 à zéro. Désolé ! :)
+        // Autre Bogue potentiel si tu restes dans le Kayak plus de 49 jours tu risques d'avoir un bogue dans l'heure UTC, car le compteur millis va faire un rollover de 4294967295 à zéro. :)
         // Extraire la date du message ZDA
         utcDate[0] = receivedChars[23];   //A
         utcDate[1] = receivedChars[24];   //A
