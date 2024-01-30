@@ -72,7 +72,6 @@
 //
 // ***** Constant *****
 //
-//
 // Habituellement les SBC Arduino définissent 'LED_BUILTIN'
 // Ce symbole est associé à la broche pin_size_t qui est la LED embarquée.
 //
@@ -148,10 +147,10 @@ void TransmitReadyISR()                         // Noter le signal de la broche 
 //
 void setup() {        // Au démarrare du Artemis thing plus toutes les broches sont "pulled LOW". 
   byte tempoByte = 0;
-  Serial.begin( 115200 );                                             // Démarrer la communication Serie USB.
+  Serial.begin( 9600 );                                               // Démarrer la communication Serie USB.
   while ( !Serial );                                                  // Attendre l'ouverture de la communication (nécessaire sur certain board seulement).
   Serial.print( "Serial_0-USB( OK ), " );                             // Confirmation de la disponibilité du port Série USB  "Serial"  
-  Serial1.begin( 115200 );                                            // Port série UART du Artemis thing plus.  "Serial1"
+  Serial1.begin( 9600 );                                              // Port série UART du Artemis thing plus.  "Serial1"
   while ( !Serial1 );                                                 // Wait for serial connection to open (only necessary on some boards).
   Serial.print( "Serial_1-UART( OK ), " );                            // Confirmation de la disponibilité du port Série UART "Serial1"
   // 
@@ -195,14 +194,16 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
   //
   if( Serial1.available() ) {                                 // Caractères disponibles en provenance du GPS.
     inByte = Serial1.read();                                  // Lire un caractère comme un byte en provenance du GPS ( Serial1 broche RX en provenance du GPS).
-    Serial1.write( inByte /*= Serial1.read() */);            // Écrire ce même caractère vers le data logger         ( Serial1 broche TX à destination du data loggeur).
+    if( 0 != inByte && debutNMEA ){
+      Serial1.write( inByte /*= Serial1.read() */);            // Écrire ce même caractère vers le data logger         ( Serial1 broche TX à destination du data loggeur).
+    }  
     //
     if( inByte == '$' ) {                                     // Est-ce un début de message '$'
       debutNMEA = true;                                       // Début de message détecté.
       finNMEA   = false;                                      // Début message, alors annule fin de message.
       receivedChars[0] = inByte;                              // Enregistre la caractère courant dans le buffer. Le début de message commence toujours à l'indice zéro du tableau      
       indexMsg = 1;                                           // incrémente le pointeur du tableau des caractères reçus pour le prochain caractère.
-    } else if ( inByte == 10 /*|| indexMsg > 87*/ ) {         // Fin message (Max longueur NMEA = 85, mais U-BLox génère exceptionnellement des messages NMEA d'une longueur = 87 et des messages vides avec un LF à la fin.  
+    } else if ( 10 == inByte /*|| indexMsg > 90 */ ) {         // Fin message (Max longueur NMEA = 85, mais U-BLox génère exceptionnellement des messages NMEA d'une longueur = 87 et des messages vides avec un LF à la fin.  
         receivedChars[indexMsg] = inByte;                     // Enregistre le caractère courant dans le buffer.
         indexMsg++;                                           // incrémente le pointeur du tableau des caractères reçus pour le prochain caractère.
         finNMEA = true;                                       // Fin de message détectée.
@@ -220,7 +221,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
     // Si c'est le dernier caractère du bloc vous avez environ 900 mS avant le prochain PPS pour faire des tâches connexes. Sinon il y a risque de perdre des caractères en provenance du GPS.
     //
     if ( debutNMEA && finNMEA ) {                // Le message NMEA courant est complet.
-      if ( receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'R' && receivedChars[4] == 'M' && receivedChars[5] == 'C' && receivedChars[6] == ',' ) { // Message "$GNRMC," détecté. Extraire l'heure UTC.
+      if ( receivedChars[0] == '$' && receivedChars[1] == 'G' && (receivedChars[2] == 'N' || receivedChars[2] == 'P' || receivedChars[2] == 'L' || receivedChars[2] == 'A' ) && receivedChars[3] == 'R' && receivedChars[4] == 'M' && receivedChars[5] == 'C' && receivedChars[6] == ',' ) { // Message "$GNRMC," détecté. Extraire l'heure UTC.
         //digitalWrite(LED_BUILTIN, HIGH);      // Allumer la LED bleue pour indiquer l'arrivé du signal PPS.
         utcTime[0] = receivedChars[7];          //H
         utcTime[1] = receivedChars[8];          //H
@@ -230,7 +231,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         utcTime[5] = receivedChars[12];         //S
         utcTime[6] = receivedChars[13];         //.  on sauve des mS en utilisant directement receivedChars 
       }//endif $GNRMC,                                  //  Duré totale de l'envoi du message UTC environ 2.4 mS :) :) :)
-      else if (receivedChars[0] == '$' && receivedChars[1] == 'G' && receivedChars[2] == 'N' && receivedChars[3] == 'Z' && receivedChars[4] == 'D' && receivedChars[5] == 'A' && receivedChars[6] == ',' ) { //Message "$GNZDA," détecté. Extraire la date UTC.
+      else if (receivedChars[0] == '$' && receivedChars[1] == 'G' && (receivedChars[2] == 'N' || receivedChars[2] == 'P' || receivedChars[2] == 'L' || receivedChars[2] == 'A' ) && receivedChars[3] == 'Z' && receivedChars[4] == 'D' && receivedChars[5] == 'A' && receivedChars[6] == ',' ) { //Message "$GNZDA," détecté. Extraire la date UTC.
         // Peut être entrecoupé d'un délai jusqu'à 800 mS à cause de la priorité plus grande accordée au traitement du signal PPS dans le GPS quel celle pour l'envoi des messages NMEA (avant ou pendant ou  après le PPS).
         // Ce n'est pas grave si le message "$GNZDA," est entrecoupé d'un délai d'environ 750 mS car stratégiquement on ne garde que sa date. 
         // S.V.P. Raphaël ne fait pas de kayak à 00h00 UTC, car il y a bogue ici. Le changement de date est potentiellement retardé d'une seconde à cause de la dérive du PPS dans les messages NMEA :), mais l'heure est toujours bonne.
@@ -260,8 +261,8 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
         else if( DeltaUTC > 9 ){ Serial1.printf( "0%u0\r\n", DeltaUTC ); }    // Entre 10 et 99
         else { Serial1.printf( "00%u0\r\n", DeltaUTC ); }                     // Entre 0 et 9
         //
-       if( horodatePPS == 0 ) {
-         Serial.write( "GPS COLD START ! Attente rétablissement du signal PPS.\r\n" ); 
+       if( 0 == horodatePPS ) {
+         Serial.write( "GPS Cold Start ! Attente rétablissement du signal PPS.\r\n" ); 
        }  
       }//endif $GNZDA,
       debutNMEA = false;           // Message traité on attend un nouveau message.
@@ -282,7 +283,7 @@ void loop() { // La boucle loop() est trop lente pour des SBC d'une fréquence <
 // À 115200 bauds, un caractère est transmis en 86 microsecondes.
 //   À 115200 bauds, entre chaque caractère reçu Arduino dispose de 86 microsecondes ou 1276 instructions Arduino pour faire d'autre chose.
 // Le buffer pour les ports série est de 64 caractères, on estime 32 caractères IN et 32 caractères OUT car le flot des données est relativement symétrique.
-//   32 caractères * 86 microsecondes =  2,7 millisecondes de lousse.
+//   32 caractères * 86,806 microsecondes =  2,7 millisecondes de lousse.
 //   Ici tous les caractères sont envoyés à mesure de leurs réceptions, au pif 60 caractères IN et 4 caractères OUT pour le pire cas (lors de l'envoi de $UTC). Donc un lousse sécuritaire entre 5,34 et 5,69 millisecondes.  
 // Quand une série complète de messages est reçue (environ 512 caractères ou 45 millisecondes) il reste environ 955 millisecondes d'attente avant la prochaine série associée au PPS suivant.
 //   Le message $UTC est construit et expédié tout de suite après le message $GNRMC en moins de 2.5 mS. On est dans les marges sécuritaires pour ne pas perdre des caractères à cause d'un buffer overflow. 
